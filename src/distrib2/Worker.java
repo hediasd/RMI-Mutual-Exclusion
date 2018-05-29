@@ -43,17 +43,20 @@ class Worker {
         }
 
         while (true) {
-
+            //SE SERVIDOR
             if (LocalCoordinator.MasterCoordinator) {
+                //TIMEOUT DE PROCESSOS MORTOS
+                LocalCoordinator.CheckTimeout();
 
                 System.out.println("... Serving ...");
-
+                
+            //SE WORKER
             } else {
 
                 boolean Elect = false;
 
                 try {
-
+                    // CONSTANTEMENTE REQUERE RECURSOS
                     CoordinatorInterface Server = (CoordinatorInterface) Naming.lookup("//localhost/Server");
                     boolean Allowed = Server.RequestResource("Worker" + LocalCoordinator.MyID);
                     
@@ -61,14 +64,11 @@ class Worker {
                     
                     if (Allowed) {
                         
-                        
+                        // REALIZA OPERACOES E DORME
                         LocalCoordinator.MathOperation();
-                        
                         boolean Released = Server.ReleaseResource("Worker" + LocalCoordinator.MyID);
-                        
                         System.out.println("Resource released ? " + Released);
-                        
-                        sleep(1000 + rand.nextInt(500));
+                        sleep(2000 + rand.nextInt(1000));
                         
                     }
 
@@ -109,6 +109,7 @@ class Worker {
         }
     }
 
+    // REGISTRA UM NOVO PROCESSO
     public static void WorkerRegister() throws RemoteException, NotBoundException, MalformedURLException {
 
         CoordinatorInterface Server = (CoordinatorInterface) Naming.lookup("//localhost/Server");
@@ -120,13 +121,15 @@ class Worker {
         System.out.println("My new ID is " + LocalCoordinator.MyID);
         if (LocalCoordinator.MyID >= 0) {
             Naming.rebind("Worker" + LocalCoordinator.MyID, LocalCoordinator);
-            Bound = true;
             System.out.println("I'm bound as Worker" + LocalCoordinator.MyID);
+            Bound = true;
         } else {
             System.out.println("Something messed up the registering process !!!");
         }
     }
 
+    
+    // REALIZA ELEICOES ENTRE OS PROCESSOS
     public static boolean Elections() {
 
         boolean Elected = true;
@@ -156,8 +159,7 @@ class Worker {
                 System.out.println("Remote Exception");
                 f.printStackTrace();
             } catch (NotBoundException f) {
-                // No such worker ID
-                //f.printStackTrace();
+                // No such id;
             } catch (Exception f) {
 
                 System.out.println("I have failed somewhere during elections");

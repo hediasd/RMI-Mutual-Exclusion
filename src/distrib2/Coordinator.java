@@ -9,6 +9,7 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Random;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Coordinator extends UnicastRemoteObject implements CoordinatorInterface {
@@ -21,12 +22,11 @@ public class Coordinator extends UnicastRemoteObject implements CoordinatorInter
     public Integer[] IDs;
     public ReentrantLock lock;
 
-    public String LastTime;
+    public long AllocationTime;
 
     public Coordinator(boolean Master) throws RemoteException {
 
         lock = new ReentrantLock();
-
         MyID = -1;
         WritePermission = "";
         MasterCoordinator = Master;
@@ -38,104 +38,113 @@ public class Coordinator extends UnicastRemoteObject implements CoordinatorInter
 
     }
 
+    // REQUISITA ACESSO AO RECURSO
+    @Override
     public boolean RequestResource(String Requester) throws RemoteException {
 
-        //lock.lock();
-        try {
-            if (WritePermission.equals("")) {
-                WritePermission = Requester;
-                System.out.println("Granted resource to " + Requester);
-                //lock.unlock();
-                return true;
-            }
-        } finally {
+        if (WritePermission.equals("")) {
+            WritePermission = Requester;
+            AllocationTime = System.currentTimeMillis();
+            System.out.println("Granted resource to " + Requester);
             //lock.unlock();
+            return true;
         }
 
         return false;
 
     }
 
+    // REALIZA AS 10 OPERACOES MATEMATICAS
+    // CADA PROCESSO REALIZA UM PADRAO DE OPERACOES
+    // UTILIZANDO A CLASSE RANDOM E SEU ID COMO SEED
+    @Override
     public String MathOperation() throws FileNotFoundException, IOException {
 
-        lock.lock();
         String mathResult = "";
+        Random rand = new Random();
+        rand.setSeed(MyID);
+        int[] randoms = new int[10];
 
-        try {
-            BufferedReader BR = new BufferedReader(new FileReader("file.txt"));
+        String debugLog = "";
+        // DEFINE AS DEZ OPERACOES A SEREM REALIZADAS
+        // CADA ID REALIZA SEMPRE AS MESMAS 10 OPERACOES
+        for (int i = 0; i < 10; i++) {
+            randoms[i] = rand.nextInt(5) + 1;
+            debugLog += randoms[i] + ", ";
+        }
+        System.out.println(debugLog);
 
-            String currentLine = "";
-            String lastLine = "";
-            int lastLineInteger = 1;
+        
+        // DEZ OPERACOES NO ARQUIVO
+        for (int i = 0; i < 10; i++) {
 
-            do {
-                lastLine = currentLine;
-                System.out.println("Line " + lastLine);
-            } while ((currentLine = BR.readLine()) != null);
-            BR.close();
-            BufferedWriter BW = new BufferedWriter(new FileWriter("file.txt", true));
+            lock.lock();
 
-            lastLineInteger = Integer.parseInt(lastLine);
-            System.out.println("Last line is " + lastLineInteger);
+            try {
+                BufferedReader BR = new BufferedReader(new FileReader("file.txt"));
 
-            System.out.println(lastLineInteger);
-            String operation = "";
+                String currentLine = "";
+                String lastLine = "";
+                int lastLineInteger = 1;
 
-            switch (MyID) {
-                case 1:
-                    operation = " + 10";
-                    lastLineInteger += 10;
-                    BW.write(operation);
-                    BW.newLine();
-                    BW.write(String.valueOf(lastLineInteger));
-                    System.out.println(operation);
-                    break;
-                case 2:
-                    operation = " * 2";
-                    lastLineInteger *= 2;
-                    BW.write(operation);
-                    BW.newLine();
-                    BW.write(String.valueOf(lastLineInteger));
-                    System.out.println(operation);
-                    break;
-                case 3:
-                    operation = " - 15";
-                    lastLineInteger -= 15;
-                    BW.write(operation);
-                    BW.newLine();
-                    BW.write(String.valueOf(lastLineInteger));
-                    System.out.println(operation);
-                    break;
+                do {
+                    lastLine = currentLine;
+                    System.out.println("Line " + lastLine);
+                } while ((currentLine = BR.readLine()) != null);
+                BR.close();
+                BufferedWriter BW = new BufferedWriter(new FileWriter("file.txt", true));
 
-                case 4:
+                lastLineInteger = Integer.parseInt(lastLine);
+                System.out.println("Last line is " + lastLineInteger);
+                String operation = "";
 
-                    break;
+                switch (randoms[i]) {   //MyID
+                    case 1:
+                        operation = " + 20";
+                        lastLineInteger += 20;
+                        break;
 
-                case 5:
+                    case 2:
+                        operation = " * 2";
+                        lastLineInteger *= 2;
+                        break;
 
-                    break;
+                    case 3:
+                        operation = " - 25";
+                        lastLineInteger -= 25;
+                        break;
 
-                default:
-                    operation = " pow 2";
-                    lastLineInteger *= lastLineInteger;
-                    BW.write(operation);
-                    BW.newLine();
-                    BW.write(lastLineInteger);
-                    System.out.println(operation);
-                    break;
+                    case 4:
+                        operation = " * 3";
+                        lastLineInteger *= 3;
+                        break;
 
+                    case 5:
+                        operation = " / 2";
+                        lastLineInteger /= 2;
+                        break;
+
+                }
+
+                BW.write(operation + " (Worker" + MyID + ")");
+                BW.newLine();
+                BW.write(String.valueOf(lastLineInteger));
+                System.out.println(operation);
+
+                BW.close();
+
+            } finally {
+                lock.unlock();
             }
 
-            BW.close();
-
-        } finally {
-            lock.unlock();
         }
 
         return mathResult;
 
     }
 
+    // LIBERTA O RECURSO REQUISITADO
+    @Override
     public boolean ReleaseResource(String Requester) {
 
         lock.lock();
@@ -143,10 +152,10 @@ public class Coordinator extends UnicastRemoteObject implements CoordinatorInter
             if (Requester.equals(WritePermission)) {
                 WritePermission = "";
                 System.out.println(Requester + " has released");
-                
+
                 return true;
             } else {
-                System.out.println("Released messed up ? " + Requester + " " + WritePermission + "Equals ? " + Requester.equals(WritePermission));
+                //System.out.println("Released messed up ? " + Requester + " " + WritePermission + "Equals ? " + Requester.equals(WritePermission));
             }
         } finally {
             lock.unlock();
@@ -160,6 +169,7 @@ public class Coordinator extends UnicastRemoteObject implements CoordinatorInter
         return true;
     }
 
+    // REGISTRO DE ID
     public Integer Register() throws RemoteException {
         for (int i = 1; i < IDsAmount; i++) {
             System.out.println(IDs[i]);
@@ -172,8 +182,20 @@ public class Coordinator extends UnicastRemoteObject implements CoordinatorInter
         return -1;
     }
 
+    
+    // VOTO PARA ELEICAO
     public boolean MayICoordinateNow(int RequesterID) throws RemoteException {
         return (!MasterCoordinator && RequesterID > MyID);
+    }
+
+    // WRITE PERMISSION TIMEOUT
+    public boolean CheckTimeout() {
+        long Now = System.currentTimeMillis();
+        if ((!WritePermission.equals("")) && Now >= (AllocationTime + 10000)) {
+            ReleaseResource(WritePermission);
+            return true;
+        }
+        return false;
     }
 
 }
